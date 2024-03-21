@@ -1,11 +1,13 @@
-import subprocess
 import os
+import platform
+import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
-import shutil
-import platform
+
 import requests
+
 
 def download_file(url, output_path):
     response = requests.get(url, stream=True)
@@ -24,23 +26,27 @@ def download_file(url, output_path):
 def merge_directory_contents(directory_path):
     directory_content = ""
     core_file_name = "core.lua"
-    
+
     if os.path.exists(directory_path):
         print(f"Processing directory: {directory_path}")
-        
+
         # Process core.lua first if it exists
         core_file_path = os.path.join(directory_path, core_file_name)
         if os.path.isfile(core_file_path):
             try:
                 with open(core_file_path, "r", encoding="utf-8") as file:
-                    directory_content += file.read() + "\n"  # Append the core file content first
+                    directory_content += (
+                        file.read() + "\n"
+                    )  # Append the core file content first
                     print(f"Appended {core_file_name} to the directory content")
             except IOError as e:
                 print(f"Error reading {core_file_path}: {e}")
-        
+
         # Process the rest of the .lua files
         for file_name in os.listdir(directory_path):
-            if file_name.endswith(".lua") and file_name != core_file_name:  # Skip the core.lua file
+            if (
+                file_name.endswith(".lua") and file_name != core_file_name
+            ):  # Skip the core.lua file
                 file_path = os.path.join(directory_path, file_name)
                 try:
                     with open(file_path, "r", encoding="utf-8") as file:
@@ -129,25 +135,23 @@ seven_zip_dir = tempfile.TemporaryDirectory()
 print(seven_zip_dir.name)
 print("Downloading and extracting 7-Zip suite...")
 download_file(seven_zip_url, os.path.join(seven_zip_dir.name, "7z.zip"))
-with zipfile.ZipFile(
-    os.path.join(seven_zip_dir.name, "7z.zip"), "r"
-) as zip_ref:
+with zipfile.ZipFile(os.path.join(seven_zip_dir.name, "7z.zip"), "r") as zip_ref:
     zip_ref.extractall(seven_zip_dir.name)
 
 # Check the operating system
-#if os.name() == 'Linux':
+# if os.name() == 'Linux':
 #    seven_zip_path = ['wine', os.path.join(seven_zip_dir.name, "7z.exe")]
-#elif os.name == 'nt':
+# elif os.name == 'nt':
 #    seven_zip_path = os.path.join(seven_zip_dir.name, "7z.exe")
-#else:
+# else:
 #    # Handle other operating systems or raise an error
 #    raise NotImplementedError("This script only supports Windows and Linux.")
 
 seven_zip_path = f"{seven_zip_dir.name}/7z.exe"
 
 # Determine the operating system and prepare the 7-Zip command accordingly
-if os.name == 'posix':
-    if platform.system() == 'Darwin':
+if os.name == "posix":
+    if platform.system() == "Darwin":
         # This is macOS
         command = "7zz"  # Update this path as necessary for macOS
     else:
@@ -157,7 +161,7 @@ else:
     # This is for Windows
     command = f"{seven_zip_dir.name}/7z.exe"
 
-#command = seven_zip_dir + ["x", "-o" + temp_dir.name, sfx_archive_path]
+# command = seven_zip_dir + ["x", "-o" + temp_dir.name, sfx_archive_path]
 
 # seven_zip_path = os.path.join(seven_zip_dir.name, "7z.exe")
 
@@ -174,7 +178,7 @@ print(f"SFX Archive received: {sfx_archive_path}")
 temp_dir = tempfile.TemporaryDirectory()
 print(temp_dir.name)
 # Extract the SFX archive
-#subprocess.run([command, "x", "-o" + temp_dir.name, sfx_archive_path])
+# subprocess.run([command, "x", "-o" + temp_dir.name, sfx_archive_path])
 subprocess.run([command, "x", f"-o{temp_dir.name}", sfx_archive_path], check=True)
 print("Extraction complete.")
 
@@ -210,10 +214,10 @@ modify_game_lua(game_lua_path)
 print("Modification of game.lua complete.")
 
 # Update the SFX archive with the modified main.lua
-#subprocess.run([command, "a", sfx_archive_path, main_lua_output_path])
+# subprocess.run([command, "a", sfx_archive_path, main_lua_output_path])
 subprocess.run([command, "a", sfx_archive_path, main_lua_output_path], check=True)
 # Update the SFX archive with the modified game.lua
-#subprocess.run([command, "a", sfx_archive_path, game_lua_path])
+# subprocess.run([command, "a", sfx_archive_path, game_lua_path])
 subprocess.run([command, "a", sfx_archive_path, game_lua_path], check=True)
 print("SFX Archive updated.")
 
