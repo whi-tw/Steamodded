@@ -1,8 +1,10 @@
+import logging
 import os
 import platform
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 try:
     from typing import Literal
@@ -14,14 +16,22 @@ import zipfile
 import requests
 
 
-def download_file(url, output_path):
+class SteamoddedException(Exception):
+    pass
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=os.environ.get("LOGLEVEL", "INFO"), format="%(levelname)s: %(message)s"
+)
+
+
+def download_file(url: str, output_path: Path):
     response = requests.get(url, stream=True, timeout=10)  # Add timeout argument
-    if response.status_code == 200:
-        with open(output_path, "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
-        return True
-    return False
+    response.raise_for_status()
+    with output_path.open("wb") as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            file.write(chunk)
 
 
 # def decompile_lua(decompiler_path, lua_path, output_dir):
@@ -115,8 +125,20 @@ def modify_game_lua(game_lua_path):
         print(f"Error modifying game.lua: {e}")
 
 
-def main():
-    print("Starting the process...")
+def main(sfx_archive_path: Path, tmpdir: Path):
+    logger.info("Starting the process...")
+    logger.debug("Root working directory: %s", tmpdir)
+
+    # Check if the SFX archive path is provided
+    try:
+        sfx_archive_path = Path(sys.argv[1])
+        logging.info("SFX Archive received: %s", sfx_archive_path)
+    except IndexError as e:
+        logging.error(
+            "SFX not provided. Please drag and drop the SFX archive onto this"
+            " executable."
+        )
+        raise SteamoddedException("SFX not provided") from e
 
     # URL to download the LuaJIT decompiler
     # luajit_decompiler_url = ""
@@ -137,12 +159,6 @@ def main():
     seven_zip_url = "https://github.com/Steamopollys/Steamodded/raw/main/7-zip/7z.zip"
 
     # Temporary directory for 7-Zip suite
-    seven_zip_dir = tempfile.TemporaryDirectory()
-    print(seven_zip_dir.name)
-    print("Downloading and extracting 7-Zip suite...")
-    download_file(seven_zip_url, os.path.join(seven_zip_dir.name, "7z.zip"))
-    with zipfile.ZipFile(os.path.join(seven_zip_dir.name, "7z.zip"), "r") as zip_ref:
-        zip_ref.extractall(seven_zip_dir.name)
 
     # Check the operating system
     # if os.name() == 'Linux':
@@ -159,40 +175,67 @@ def main():
     if os_name == "posix":
         if platform.system() == "Darwin":
             # This is macOS
-            command = "7zz"  # Update this path as necessary for macOS
+            seven_zip_command = "7zz"  # Update this path as necessary for macOS
         else:
             # This is Linux or another POSIX-compliant OS
-            command = "7zz"
+            seven_zip_command = "7zz"
     else:
         # This is for Windows
-        command = f"{seven_zip_dir.name}/7z.exe"
+        sz_path = tmpdir / "7-Zip"
+        sz_path.mkdir(exist_ok=True)
+        logging.info("Downloading and extracting 7-Zip suite to %s", sz_path)
+
+        sz_zip_path = sz_path / "7z.zip"
+        try:
+            download_file(seven_zip_url, sz_zip_path)
+        except requests.RequestException as e:
+            raise SteamoddedException(
+                f"Failed to download 7-Zip suite from {seven_zip_url}"
+            ) from e
+        with zipfile.ZipFile(sz_zip_path, "r") as zip_ref:
+            zip_ref.extractall(sz_path)
+        seven_zip_command = os.path.join(sz_path, "7z.exe")
+
+    # Check if seven_zip_command is set, and is an executable file
+    try:
+        subprocess.run([seven_zip_command], check=True)
+    except subprocess.CalledProcessError as e:
+        raise SteamoddedException(
+            f"Could not locate 7-Zip executable at {seven_zip_command}"
+        ) from e
 
     # command = seven_zip_dir + ["x", "-o" + temp_dir.name, sfx_archive_path]
 
     # seven_zip_path = os.path.join(seven_zip_dir.name, "7z.exe")
 
-    # Check if the SFX archive path is provided
-    if len(sys.argv) < 2:
-        print("Please drag and drop the SFX archive onto this executable.")
-        seven_zip_dir.cleanup()
-        sys.exit(1)
-
-    sfx_archive_path = sys.argv[1]
-    print(f"SFX Archive received: {sfx_archive_path}")
-
     # Temporary directory for extraction and modification
-    temp_dir = tempfile.TemporaryDirectory()
-    print(temp_dir.name)
+    workdir = tmpdir / "work"
+    workdir.mkdir(exist_ok=True)
+
+    logging.debug("Working directory: %s", workdir)
     # Extract the SFX archive
     # subprocess.run([command, "x", "-o" + temp_dir.name, sfx_archive_path])
-    subprocess.run([command, "x", f"-o{temp_dir.name}", sfx_archive_path], check=True)
-    print("Extraction complete.")
+    try:
+        subprocess.run(
+            [seven_zip_command, "x", f"-o{workdir.name}", sfx_archive_path], check=True
+        )
+        logging.info("Extraction complete.")
+    except subprocess.CalledProcessError as e:
+        raise SteamoddedException(
+            f"Failed to extract SFX archive {sfx_archive_path} to {workdir}"
+        ) from e
 
     # Path to main.lua and game.lua within the extracted files
-    main_lua_path = os.path.join(temp_dir.name, "main.lua")
-    game_lua_path = os.path.join(temp_dir.name, "game.lua")
-    decompile_output_path = os.path.join(temp_dir.name, "output")
-    os.makedirs(decompile_output_path, exist_ok=True)  # Create the output directory
+    try:
+        main_lua_path = workdir / "main.lua"
+        assert main_lua_path.is_file(), f"main.lua not found at {main_lua_path}"
+        game_lua_path = workdir / "game.lua"
+        assert game_lua_path.is_file(), f"game.lua not found at {game_lua_path}"
+    except AssertionError as e:
+        raise SteamoddedException(e) from e
+
+    # decompile_output_path = workdir / "output"
+    # decompile_output_path.mkdir(exist_ok=True)  # Create the output directory
 
     # This part was used to decompile to game data
     # No longer needed
@@ -218,14 +261,18 @@ def main():
 
     # Update the SFX archive with the modified main.lua
     # subprocess.run([command, "a", sfx_archive_path, main_lua_output_path])
-    subprocess.run([command, "a", sfx_archive_path, main_lua_path], check=True)
+    subprocess.run(
+        [seven_zip_command, "a", sfx_archive_path, main_lua_path], check=True
+    )
     # Update the SFX archive with the modified game.lua
     # subprocess.run([command, "a", sfx_archive_path, game_lua_path])
-    subprocess.run([command, "a", sfx_archive_path, game_lua_path], check=True)
+    subprocess.run(
+        [seven_zip_command, "a", sfx_archive_path, game_lua_path], check=True
+    )
     print("SFX Archive updated.")
 
-    seven_zip_dir.cleanup()
-    temp_dir.cleanup()
+    tmpdir.cleanup()
+    workdir.cleanup()
 
     print("Process completed successfully.")
     print("Press any key to exit...")
@@ -233,4 +280,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            main(temporary_dir)
+    except SteamoddedException as err:
+        logger.error(err)
+        sys.exit(1)
