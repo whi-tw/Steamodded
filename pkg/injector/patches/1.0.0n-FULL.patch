@@ -1,0 +1,13 @@
+diff --git a/game.lua b/../Patched/game.lua
+index 6f3bdf3..af6dbb6 100644
+--- a/game.lua
++++ b/../Patched/game.lua
+@@ -203,7 +203,7 @@ function Game:start_up()
+     --Create the event manager for the game
+     self.E_MANAGER = EventManager()
+     self.SPEEDFACTOR = 1
+-    
++    initSteamodded()
+ 
+     self:prep_stage(G.STAGES.MAIN_MENU, G.STATES.SPLASH, true)
+     set_profile_progress()
