@@ -7,6 +7,7 @@ toolchain go1.22.1
 require (
 	github.com/bluekeyes/go-gitdiff v0.7.2
 	github.com/charmbracelet/log v0.3.1
+	github.com/liamg/magic v0.0.1
 	github.com/urfave/cli/v2 v2.27.1
 )
 
@@ -15,7 +16,6 @@ require (
 	github.com/charmbracelet/lipgloss v0.9.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/liamg/magic v0.0.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.18 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
