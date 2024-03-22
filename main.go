@@ -23,6 +23,22 @@ func main() {
 	app := &cli.App{
 		Name:  "steammodded-injector",
 		Usage: "A mod injector for Balatro",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "log-level",
+				Aliases: []string{"l"},
+				Usage:   "Set the log level (debug, info, warn, error)",
+				Value:   "info",
+				Action: func(context *cli.Context, value string) error {
+					level, err := log.ParseLevel(value)
+					if err != nil {
+						return err
+					}
+					log.SetLevel(level)
+					return nil
+				},
+			},
+		},
 		Action: func(context *cli.Context) error {
 			firstArg := context.Args().First()
 			if firstArg != "" {

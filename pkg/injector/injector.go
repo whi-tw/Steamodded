@@ -45,6 +45,7 @@ func NewInjector(executablePath string) (SteamoddedInjector, error) {
 	switch balatroType {
 	case BalatroTypeWindows:
 		log.Debug("Detected Balatro type is Windows")
+		return newBalatroWindowsInjector(executablePath)
 	case BalatroTypeMacOS:
 		log.Debug("Detected Balatro type is MacOS")
 		return newBalatroMacOSInjector(executablePath)
@@ -52,7 +53,6 @@ func NewInjector(executablePath string) (SteamoddedInjector, error) {
 		//goland:noinspection GoErrorStringFormat
 		return nil, fmt.Errorf("Could not determine balatro type.")
 	}
-	return nil, fmt.Errorf("weird")
 }
 
 type BalatroInjector struct {

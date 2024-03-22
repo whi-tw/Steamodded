@@ -192,3 +192,6 @@ pyrightconfig.json
 /steamodded_injector.onefile-build/
 /steamodded_injector.exe
 /distributions
+
+/steamodded
+/steamodded.exe
